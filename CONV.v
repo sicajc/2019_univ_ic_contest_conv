@@ -34,7 +34,7 @@ module  CONV(
 
 	always @(posedge clk )
 	begin
-		conv_current_state <= reset ? IDLE : conv_next_state;
+		conv_current_state <= reset ? IDLE : conv_next_state+3;
 	end
 
 
