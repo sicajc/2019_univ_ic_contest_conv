@@ -30,11 +30,14 @@ module  CONV(
 	always @(posedge clk)
 	begin
 		counter_reg <= reset ? 0 : counter_reg+1;
+<<<<<<< HEAD
 	end
 
 	always @(posedge clk )
 	begin
 		conv_current_state <= reset ? IDLE : conv_next_state;
+=======
+>>>>>>> 95e4a9641de472ea98b92faf8d90a9b62e94f71c
 	end
 
 
