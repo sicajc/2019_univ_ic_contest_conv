@@ -29,7 +29,7 @@ module  CONV(
 
 	always @(posedge clk)
 	begin
-		counter_reg <= reset ? 0 : counter_reg;
+		counter_reg <= reset ? 0 : counter_reg+1;
 	end
 
 	always @(posedge clk )
