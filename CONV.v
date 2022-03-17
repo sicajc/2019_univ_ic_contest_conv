@@ -1,5 +1,4 @@
 `timescale 1ns/10ps
-
 module CONV(input		clk,
             input		reset,
             output		busy,
