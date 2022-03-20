@@ -215,8 +215,10 @@ module CONV(clk,
                 end
             end
     end
+
     //Addr converter
-    assign iaddr = row_pointer_reg * IMAGE_WIDTH + col_pointer_reg;
+    assign addr = row_pointer_reg * IMAGE_WIDTH + col_pointer_reg;
+    assign iaddr = conv_state_RD_DATA ? addr : 'z;
 
     /*--------------------------CONV_ZER0_PAD---------------------------*/
     reg signed[DATA_WIDTH-1:0] sma_input_1;
@@ -343,11 +345,28 @@ module CONV(clk,
 
     assign biased_result = sma_output_reg[17:36]; //Truncated result
 
+
     /*------------------RELU----------------------*/
+    reg[DATA_WIDTH-1:0] relu_result_reg;
     always @(posedge clk or posedge clk)
     begin
-
-
+        if(reset)
+        begin
+            relu_result_reg <= 'd0;
+        end
+        else if(conv_state_RELU)
+        begin
+           relu_result_reg <= (biased_result >= 0) ? biased_result : 'd0;
+        end
+        else
+        begin
+           relu_result_reg <= relu_result_reg;
+        end
     end
+
+    /*-------------------WB-------------------*/
+    assign cdata_wr = conv_state_WB ?  relu_result_reg : 'z;
+    assign caddr_wr = conv_state_WB ?  addr : 'z;
+
 
 endmodule
