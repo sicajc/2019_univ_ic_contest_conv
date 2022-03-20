@@ -221,11 +221,15 @@ module CONV(clk,
     /*--------------------------CONV_ZER0_PAD---------------------------*/
     reg signed[DATA_WIDTH-1:0] sma_input_1;
     reg signed[DATA_WIDTH-1:0] sma_input_2;
-    reg signed[DATA_WIDTH-1:0] sma_output_reg;
+    reg signed[2*DATA_WIDTH-1:0] sma_output_reg; //Need extra bit to prevent overflow after calculating due to multiplication
+    wire[DATA_WIDTH-1:0] biased_result;
 
     wire[3:0] kernal_addr;
     wire process_image_right_end_reach_flag;
     wire process_image_bottom_end_reach_flag;
+
+    wire[POINTER_WIDTH-1:0] process_row_pointer;
+    wire[POINTER_WIDTH-1:0] process_col_pointer;
 
     //offset_row_pointer_reg
     always @(posedge clk or posedge reset)
@@ -243,7 +247,7 @@ module CONV(clk,
             offset_row_pointer_reg <= offset_row_pointer_reg;
         end
     end
-    //offset col pointer reg
+    //offset_col_pointer_reg
     always @(posedge clk or posedge reset)
     begin
         if (reset)
@@ -264,11 +268,9 @@ module CONV(clk,
     assign process_image_right_end_reach_flag = (offset_col_pointer_reg == 'd3);
     assign conv_done_flag = process_image_bottom_end_reach_flag;
 
-    //Serial_multiplier
-
-
+    /*-----------------Serial_Multiplier----------------*/
+    //sma_kernal_input_1
     assign kernal_addr = offset_row_pointer_reg * 3 + offset_col_pointer_reg;
-    //sma_kernal_input
     always @(*)
     begin
         case(kernal_addr)
@@ -310,11 +312,19 @@ module CONV(clk,
         end
         default:
         begin
-           sma_input_1 = 20'h11111;
+            sma_input_1 = 20'h11111;
         end
         endcase
     end
 
+    assign process_row_pointer = offset_row_pointer_reg + row_pointer_reg;
+    assign process_col_pointer = offset_col_pointer_reg + col_pointer_reg;
+
+    //sma input2 grey image
+    assign zero_pad = (process_row_pointer == 'd0) || (process_col_pointer == 'd0) || (process_row_pointer == 'd65) || (process_col_pointer == 'd65);
+    assign sma_input_2 = zero_pad ? 'd0 : zero_padded_grey_image_mem[process_row_pointer-'d1][process_col_pointer-'d1];
+
+    //Serial_multiplier
     always @(posedge clk)
     begin
         if(reset)
@@ -329,6 +339,15 @@ module CONV(clk,
         begin
             sma_output_reg <= conv_state_INCR_POINTER ? 'd0 : sma_output_reg;
         end
+    end
+
+    assign biased_result = sma_output_reg[17:36]; //Truncated result
+
+    /*------------------RELU----------------------*/
+    always @(posedge clk or posedge clk)
+    begin
+
+
     end
 
 endmodule
