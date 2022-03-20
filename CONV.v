@@ -194,7 +194,7 @@ module CONV(clk,
 
     assign right_end_reach_flag  = (col_pointer_reg == IMAGE_WIDTH);
     assign bottom_end_reach_flag = (row_pointer_reg == IMAGE_WIDTH);
-
+    assign rd_data_done_flag     = bottom_end_reach_flag;
     //Zero_padded_image_mem
     always @(posedge clk or posedge reset)
     begin
@@ -215,12 +215,120 @@ module CONV(clk,
                 end
             end
     end
+    //Addr converter
+    assign iaddr = row_pointer_reg * IMAGE_WIDTH + col_pointer_reg;
+
+    /*--------------------------CONV_ZER0_PAD---------------------------*/
+    reg signed[DATA_WIDTH-1:0] sma_input_1;
+    reg signed[DATA_WIDTH-1:0] sma_input_2;
+    reg signed[DATA_WIDTH-1:0] sma_output_reg;
+
+    wire[3:0] kernal_addr;
+    wire process_image_right_end_reach_flag;
+    wire process_image_bottom_end_reach_flag;
+
+    //offset_row_pointer_reg
+    always @(posedge clk or posedge reset)
+    begin
+        if (reset)
+        begin
+            offset_row_pointer_reg <= 'd0;
+        end
+        else if (conv_state_ZERO_PAD_CONV)
+        begin
+            offset_row_pointer_reg <= process_image_right_end_reach_flag ? 'd0 : offset_row_pointer_reg + 'd1;
+        end
+        else
+        begin
+            offset_row_pointer_reg <= offset_row_pointer_reg;
+        end
+    end
+    //offset col pointer reg
+    always @(posedge clk or posedge reset)
+    begin
+        if (reset)
+        begin
+            offset_col_pointer_reg <= 'd0;
+        end
+        else if (conv_state_ZERO_PAD_CONV)
+        begin
+            offset_col_pointer_reg <= process_image_bottom_end_reach_flag ? 'd0 : offset_col_pointer_reg + 'd1;
+        end
+        else
+        begin
+            offset_col_pointer_reg <= offset_col_pointer_reg;
+        end
+    end
+
+    assign process_image_bottom_end_reach_flag = (offset_row_pointer_reg == 'd3);
+    assign process_image_right_end_reach_flag = (offset_col_pointer_reg == 'd3);
+    assign conv_done_flag = process_image_bottom_end_reach_flag;
+
+    //Serial_multiplier
 
 
+    assign kernal_addr = offset_row_pointer_reg * 3 + offset_col_pointer_reg;
+    //sma_kernal_input
+    always @(*)
+    begin
+        case(kernal_addr)
+        'd0:
+        begin
+            sma_input_1 = 20'h0ab9e;
+        end
+        'd1:
+        begin
+            sma_input_1 = 20'h092d5;
+        end
+        'd2:
+        begin
+            sma_input_1 = 20'h06d43;
+        end
+        'd3:
+        begin
+            sma_input_1 = 20'h01004;
+        end
+        'd4:
+        begin
+            sma_input_1 = 20'hf8f71;
+        end
+        'd5:
+        begin
+            sma_input_1 = 20'hf6e54;
+        end
+        'd6:
+        begin
+            sma_input_1 = 20'hfa6d7;
+        end
+        'd7:
+        begin
+            sma_input_1 = 20'hfc834;
+        end
+        'd8:
+        begin
+            sma_input_1 = 20'hfac19;
+        end
+        default:
+        begin
+           sma_input_1 = 20'h11111;
+        end
+        endcase
+    end
 
-
-
-
-
+    always @(posedge clk)
+    begin
+        if(reset)
+        begin
+            sma_output_reg <= 'd0;
+        end
+        else if(conv_state_ZERO_PAD_CONV)
+        begin
+            sma_output_reg <= sma_input_1 * sma_input_2 + sma_output_reg ;
+        end
+        else
+        begin
+            sma_output_reg <= conv_state_INCR_POINTER ? 'd0 : sma_output_reg;
+        end
+    end
 
 endmodule
