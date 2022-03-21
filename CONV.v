@@ -1,3 +1,4 @@
+`include "four_num_sorter.v"
 module CONV(clk,
             reset,
             busy,
@@ -89,7 +90,7 @@ module CONV(clk,
     wire max_pooling_done_flag;
 
     /*--------------MEMORY---------------*/
-    reg[DATA_WIDTH-1:0] grey_image_mem[0:IMAGE_WIDTH-1][0:IMAGE_WIDTH-1];
+    reg signed[DATA_WIDTH-1:0] grey_image_mem[0:IMAGE_WIDTH-1][0:IMAGE_WIDTH-1];
 
     /*------IMAGE_ACCESS_POINTERS--------*/
     //Main frame pointers
@@ -109,9 +110,9 @@ module CONV(clk,
     wire[POINTER_WIDTH-1:0] process_row_pointer;
     wire[POINTER_WIDTH-1:0] process_col_pointer;
 
-    wire[DATA_WIDTH-1:0] biased_result;
+    wire signed[DATA_WIDTH-1:0] biased_result;
     /*----------------RELU------------------*/
-    reg[DATA_WIDTH-1:0] relu_result_reg;
+    reg signed[DATA_WIDTH-1:0] relu_result_reg;
 
     /*---------------MAX_POOLING------------*/
     wire[ADDR_WIDTH-1:0] mp_wb_addr;
