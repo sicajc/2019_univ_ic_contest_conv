@@ -474,11 +474,11 @@ module CONV(clk,
     assign caddr_wr = max_pooling_state_MP_WB ? mp_wb_addr : 'z;
 
 
-    /*---------------CONV_INCR_POINTER-------------*/
+    /*---------------CONV_INCR + MP_POINTER-------------*/
     assign whole_image_right_end_reach_flag  = (col_pointer_reg >= IMAGE_WIDTH);
     assign whole_image_bottom_end_reach_flag = (row_pointer_reg >= IMAGE_WIDTH);
 
-
+    assign max_pooling_done_flag = whole_image_bottom_end_reach_flag;
     /*-------------------------MAX_POOLING--------------------------*/
 
     assign one_one_pixel = grey_image_mem[row_pointer_reg][col_pointer_reg];
