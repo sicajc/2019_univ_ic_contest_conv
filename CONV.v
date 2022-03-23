@@ -1,4 +1,4 @@
-`include "four_num_sorter.v"
+`timescale 1ns/10ps
 module CONV(clk,
             reset,
             busy,
@@ -21,6 +21,7 @@ module CONV(clk,
     parameter POINTER_WIDTH    = 7;
     parameter STRIDE           = 2;
     parameter HALF_IMAGE_WIDTH = IMAGE_WIDTH/2;
+    parameter BIAS = 20'h01310;
     /*-----------------Varaible Declaration---------------------*/
     //INPUTS
     input clk;
@@ -75,7 +76,7 @@ module CONV(clk,
 
     //Flags
     //L0
-    wire rd_done_flag;
+    wire rd_data_done_flag;
     wire zero_pad_done_flag;
     wire conv_done_flag;
     wire rd_data_right_end_reach_flag;
@@ -84,6 +85,7 @@ module CONV(clk,
     wire process_image_bottom_end_reach_flag;
     wire whole_image_bottom_end_reach_flag;
     wire whole_image_right_end_reach_flag;
+    wire local_image_process_done_flag;
 
     //L1
     wire mp_rd_data_done_flag;
@@ -104,7 +106,7 @@ module CONV(clk,
     /*----------------SMA-------------------*/
     reg signed[DATA_WIDTH-1:0] sma_input_1;
     reg signed[DATA_WIDTH-1:0] sma_input_2;
-    reg signed[2*DATA_WIDTH-1:0] sma_output_reg; //Need extra bit to prevent overflow after calculating due to multiplication
+    reg signed[2*DATA_WIDTH:0] sma_output_reg; //Need extra bit to prevent overflow after calculating due to multiplication
 
     wire[3:0] kernal_addr;
     wire[POINTER_WIDTH-1:0] process_row_pointer;
@@ -141,16 +143,17 @@ module CONV(clk,
                 csel            = 3'b000 ;
                 crd             = 0;
             end
+            //! Read data takes 41660190ps
             RD_DATA:
             begin
-                conv_next_state = rd_done_flag ? ZERO_PAD_CONV : RD_DATA;
+                conv_next_state = rd_data_done_flag ? ZERO_PAD_CONV : RD_DATA;
                 busy            = 1;
                 csel            = 3'b000 ;
                 crd             = 0;
             end
             ZERO_PAD_CONV:
             begin
-                conv_next_state = zero_pad_done_flag ? RE_LU : ZERO_PAD_CONV;
+                conv_next_state = local_image_process_done_flag ? RE_LU : ZERO_PAD_CONV;
                 busy            = 1;
                 csel            = 3'b000 ;
                 crd             = 0;
@@ -244,15 +247,22 @@ module CONV(clk,
             case(conv_current_state)
                 RD_DATA,MP_RD_DATA:
                 begin
-                    row_pointer_reg <= rd_data_right_end_reach_flag ? 'd0 : row_pointer_reg + 'd1;
+                    if (rd_data_done_flag)
+                    begin
+                        row_pointer_reg <= 'd0;
+                    end
+                    else
+                    begin
+                        row_pointer_reg <= rd_data_right_end_reach_flag ? row_pointer_reg + 'd1 : rd_data_bottom_end_reach_flag ? 'd0 : row_pointer_reg;
+                    end
                 end
                 CONV_INCR_POINTER:
                 begin
-                    row_pointer_reg <= whole_image_bottom_end_reach_flag ? 'd0 : row_pointer_reg + 'd1;
+                    row_pointer_reg <= whole_image_bottom_end_reach_flag ? 'd0 : whole_image_right_end_reach_flag ? row_pointer_reg + 'd1 :row_pointer_reg;
                 end
                 MP_INCR_POINTER:
                 begin
-                    row_pointer_reg <= whole_image_bottom_end_reach_flag ? 'd0 : row_pointer_reg + STRIDE;
+                    row_pointer_reg <= whole_image_bottom_end_reach_flag ? 'd0 :whole_image_right_end_reach_flag ? row_pointer_reg + STRIDE : row_pointer_reg;
                 end
                 default:
                 begin
@@ -273,11 +283,18 @@ module CONV(clk,
             case(conv_current_state)
                 RD_DATA,MP_RD_DATA:
                 begin
-                    col_pointer_reg <= rd_data_bottom_end_reach_flag ? 'd0 : col_pointer_reg + 'd1;
+                    if (rd_data_done_flag)
+                    begin
+                        col_pointer_reg <= 'd0;
+                    end
+                    else
+                    begin
+                        col_pointer_reg <= rd_data_right_end_reach_flag ? 'd0 : col_pointer_reg + 'd1;
+                    end
                 end
                 CONV_INCR_POINTER:
                 begin
-                    col_pointer_reg <= whole_image_right_end_reach_flag ? 'd0 : col_pointer_reg + 'd1;
+                    col_pointer_reg <= whole_image_right_end_reach_flag ? 'd0 : local_image_process_done_flag ? col_pointer_reg + 'd1 : col_pointer_reg;
                 end
                 MP_INCR_POINTER:
                 begin
@@ -295,6 +312,7 @@ module CONV(clk,
     assign rd_data_bottom_end_reach_flag = (row_pointer_reg == IMAGE_WIDTH);
     assign rd_data_done_flag             = rd_data_bottom_end_reach_flag;
 
+    assign conv_done_flag = rd_data_done_flag;
     //grey_image_mem
     always @(posedge clk or posedge reset)
     begin
@@ -326,6 +344,7 @@ module CONV(clk,
     end
 
     //Addr converter
+    wire[ADDR_WIDTH-1:0] addr;
     assign addr  = row_pointer_reg * IMAGE_WIDTH + col_pointer_reg;
     assign iaddr = conv_state_RD_DATA ? addr : 'z;
 
@@ -344,7 +363,7 @@ module CONV(clk,
         end
         else if (conv_state_ZERO_PAD_CONV)
         begin
-            offset_row_pointer_reg <= process_image_right_end_reach_flag ? 'd0 : offset_row_pointer_reg + 'd1;
+            offset_row_pointer_reg <= process_image_bottom_end_reach_flag ? 'd0 : process_image_right_end_reach_flag ? offset_row_pointer_reg + 'd1 : offset_row_pointer_reg;
         end
         else
         begin
@@ -360,7 +379,7 @@ module CONV(clk,
         end
         else if (conv_state_ZERO_PAD_CONV)
         begin
-            offset_col_pointer_reg <= process_image_bottom_end_reach_flag ? 'd0 : offset_col_pointer_reg + 'd1;
+            offset_col_pointer_reg <= process_image_right_end_reach_flag ? 'd0 : offset_col_pointer_reg + 'd1;
         end
         else
         begin
@@ -370,7 +389,7 @@ module CONV(clk,
 
     assign process_image_bottom_end_reach_flag = (offset_row_pointer_reg == 'd3);
     assign process_image_right_end_reach_flag  = (offset_col_pointer_reg == 'd3);
-    assign conv_done_flag                      = process_image_bottom_end_reach_flag;
+    assign local_image_process_done_flag       = process_image_bottom_end_reach_flag;
 
     /*------------------------------------Serial_Multiplier-----------------------------------------*/
     //sma_kernal_input_1
@@ -438,7 +457,14 @@ module CONV(clk,
         end
         else if (conv_state_ZERO_PAD_CONV)
         begin
-            sma_output_reg <= sma_input_1 * sma_input_2 + sma_output_reg ;
+            if(process_image_right_end_reach_flag | process_image_bottom_end_reach_flag)
+            begin
+                sma_output_reg <= sma_output_reg;
+            end
+            else
+            begin
+                sma_output_reg <= sma_input_1 * sma_input_2 + sma_output_reg ;
+            end
         end
         else
         begin
@@ -446,7 +472,7 @@ module CONV(clk,
         end
     end
 
-    assign biased_result = sma_output_reg[17:36]; //Truncated result
+    assign biased_result = sma_output_reg[35:16] + BIAS; //Truncated result
 
 
     /*--------------------------------------RELU-----------------------------------------*/
@@ -458,7 +484,7 @@ module CONV(clk,
         end
         else if (conv_state_RELU)
         begin
-            relu_result_reg <= (biased_result >= 0) ? biased_result : 'd0;
+            relu_result_reg <= (biased_result > 0) ? biased_result : 'd0;
         end
         else
         begin
@@ -486,7 +512,7 @@ module CONV(clk,
     assign two_one_pixel = grey_image_mem[row_pointer_reg+1][col_pointer_reg];
     assign two_two_pixel = grey_image_mem[row_pointer_reg+1][col_pointer_reg+1];
 
-    four_num_sorter #(DATA_WIDTH) (.a(one_one_pixel),.b(one_two_pixel),.c(two_one_pixel),.d(two_two_pixel),.max(max));
+    four_num_sorter #(.DATA_WIDTH(DATA_WIDTH)) FOUR_SORTER(.a(one_one_pixel),.b(one_two_pixel),.c(two_one_pixel),.d(two_two_pixel),.max(max));
 
     //max pooling result reg
     always @(posedge clk or posedge reset)
