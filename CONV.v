@@ -104,14 +104,16 @@ module CONV(clk,
     reg[POINTER_WIDTH-1:0] offset_col_pointer_reg;
 
     /*----------------SMA-------------------*/
-    reg signed[DATA_WIDTH-1:0] sma_input_1;
-    reg signed[DATA_WIDTH-1:0] sma_input_2;
-    reg signed[2*DATA_WIDTH:0] sma_output_reg; //Need extra bit to prevent overflow after calculating due to multiplication
+    reg signed[DATA_WIDTH-1:0] sma_input_1; //-Leave 1 bit for sign bit 21 BITS
+    reg signed[DATA_WIDTH-1:0] sma_input_2; //-Leave 1 bit for sign bit 21 BITS
+    reg signed[2*DATA_WIDTH:0] sma_output_reg; //!Need extra bit to prevent overflow after calculating due to multiplication
+    //Need 44 bits because 20 + 20 + 4 , 2^4 for the multiplication value of 9 pixel, otherwise overflow occurs
 
     wire[3:0] kernal_addr;
     wire[POINTER_WIDTH-1:0] process_row_pointer;
     wire[POINTER_WIDTH-1:0] process_col_pointer;
 
+    wire signed[2*DATA_WIDTH:0] sma_result;
     wire signed[DATA_WIDTH-1:0] biased_result;
     /*----------------RELU------------------*/
     reg signed[DATA_WIDTH-1:0] relu_result_reg;
@@ -294,7 +296,7 @@ module CONV(clk,
                 end
                 CONV_INCR_POINTER:
                 begin
-                    col_pointer_reg <= whole_image_right_end_reach_flag ? 'd0 : local_image_process_done_flag ? col_pointer_reg + 'd1 : col_pointer_reg;
+                    col_pointer_reg <= whole_image_right_end_reach_flag ? 'd0 : col_pointer_reg + 'd1;
                 end
                 MP_INCR_POINTER:
                 begin
@@ -472,8 +474,9 @@ module CONV(clk,
         end
     end
 
-    assign biased_result = sma_output_reg[35:16] + BIAS; //Truncated result
 
+    assign sma_result = sma_output_reg; //!Note even addition may yield overflow!
+    assign biased_result =  sma_result[16] ? sma_result[36:17] + 'd1: sma_result[36:17];
 
     /*--------------------------------------RELU-----------------------------------------*/
     always @(posedge clk or posedge clk)
@@ -484,7 +487,8 @@ module CONV(clk,
         end
         else if (conv_state_RELU)
         begin
-            relu_result_reg <= (biased_result > 0) ? biased_result : 'd0;
+            relu_result_reg <= sma_result[40] ? 'd0 : biased_result;
+            //relu_result_reg <= sma_result[43] ? 'd0 : biased_result;
         end
         else
         begin
