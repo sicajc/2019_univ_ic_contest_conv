@@ -32,10 +32,10 @@ module CONV(clk,
     output reg crd;
     output reg cwr;
     output reg[2:0] csel;
-    output reg[ADDR_WIDTH-1:0] iaddr;
+    output [ADDR_WIDTH-1:0] iaddr;
     output reg[ADDR_WIDTH-1:0] caddr_rd;
-    output reg[DATA_WIDTH-1:0] cdata_wr;
-    output reg[ADDR_WIDTH-1:0] caddr_wr;
+    output [DATA_WIDTH-1:0] cdata_wr;
+    output [ADDR_WIDTH-1:0] caddr_wr;
 
     //CONV MAIN CTR
     parameter IDLE            = 'd0 ;
@@ -101,7 +101,7 @@ module CONV(clk,
 
     /*----------------SMA-------------------*/
     reg signed[DATA_WIDTH-1:0] sma_input_1;
-    reg signed[DATA_WIDTH-1:0] sma_input_2;
+    wire signed[DATA_WIDTH-1:0] sma_input_2;
     reg signed[2*DATA_WIDTH-1:0] sma_output_reg; //Need extra bit to prevent overflow after calculating due to multiplication
 
     wire[3:0] kernal_addr;
@@ -398,7 +398,7 @@ module CONV(clk,
         end
     end
 
-    assign biased_result = sma_output_reg[17:36]; //Truncated result
+    assign biased_result = sma_output_reg[36:17]; //Truncated result
 
 
     /*------------------RELU----------------------*/
