@@ -35,10 +35,10 @@ module CONV(clk,
     output reg crd;
     output reg cwr;
     output reg[2:0] csel;
-    output reg[ADDR_WIDTH-1:0] iaddr;
-    output reg[ADDR_WIDTH-1:0] caddr_rd;
-    output reg[DATA_WIDTH-1:0] cdata_wr;
-    output reg[ADDR_WIDTH-1:0] caddr_wr;
+    output [ADDR_WIDTH-1:0] iaddr;
+    output [ADDR_WIDTH-1:0] caddr_rd;
+    output [DATA_WIDTH-1:0] cdata_wr;
+    output [ADDR_WIDTH-1:0] caddr_wr;
 
     //CONV MAIN CTR
     parameter IDLE              = 'd0 ;
@@ -104,10 +104,9 @@ module CONV(clk,
     reg[POINTER_WIDTH-1:0] offset_col_pointer_reg;
 
     /*----------------SMA-------------------*/
-    reg signed[DATA_WIDTH-1:0] sma_input_1; //-Leave 1 bit for sign bit 21 BITS
-    reg signed[DATA_WIDTH-1:0] sma_input_2; //-Leave 1 bit for sign bit 21 BITS
-    reg signed[2*DATA_WIDTH:0] sma_output_reg; //!Need extra bit to prevent overflow after calculating due to multiplication
-    //Need 44 bits because 20 + 20 + 4 , 2^4 for the multiplication value of 9 pixel, otherwise overflow occurs
+    reg signed[DATA_WIDTH-1:0] sma_input_1;
+    wire signed[DATA_WIDTH-1:0] sma_input_2;
+    reg signed[2*DATA_WIDTH-1:0] sma_output_reg; //Need extra bit to prevent overflow after calculating due to multiplication
 
     wire[3:0] kernal_addr;
     wire[POINTER_WIDTH-1:0] process_row_pointer;
